@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>打卡網頁</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background-color: #f2f2f2;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      max-width: 400px;
+      margin: auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.5rem;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      margin: 0.25rem 0.5rem 0.25rem 0;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <input type="text" id="timeInput" readonly>
+    <div>
+      <button onclick="setTime('上班')">上班</button>
+      <button onclick="setTime('下班')">下班</button>
+      <button onclick="sendToWeChat()">打開微信</button>
+    </div>
+  </div>
+
+  <script>
+    let lastCopiedText = '';
+
+    function setTime(type) {
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hour = String(now.getHours()).padStart(2, '0');
+      const minute = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${type} ${month}/${day} ${hour}:${minute}`;
+      const input = document.getElementById('timeInput');
+      input.value = timeStr;
+      lastCopiedText = timeStr;
+
+      navigator.clipboard.writeText(timeStr).then(() => {
+        alert('已複製到剪貼簿！');
+      }).catch(err => {
+        alert('複製失敗，請手動複製');
+        console.error(err);
+      });
+    }
+
+    function sendToWeChat() {
+      if (!lastCopiedText) {
+        alert('請先按上班或下班再傳送！');
+        return;
+      }
+
+      // 嘗試打開微信 App（若已安裝）
+      location.href = 'weixin://';
+    }
+  </script>
+</body>
+</html>
