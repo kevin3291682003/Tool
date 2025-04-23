@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>打卡網頁</title>
   <style>
     body {
       font-family: sans-serif;
       padding: 2rem;
-      background-color: #f2f2f2;
+      background: linear-gradient(90deg, #000000, #7979ec);
     }
     .container {
-      background: white;
+      background-color: rgba(42, 42, 42, 0.6);
+      backdrop-filter: blur(10px);
       padding: 2rem;
       border-radius: 10px;
       max-width: 400px;
@@ -23,29 +24,45 @@
       padding: 0.5rem;
       font-size: 1rem;
       margin-bottom: 1rem;
+	  background-color: rgba(42, 42, 42, 0.6);
+      backdrop-filter: blur(10px);
+	  border-radius: 10px;
+	  color: rgba(250,250,250,0.7);
     }
     button {
       padding: 0.5rem 1rem;
       font-size: 1rem;
       margin: 0.25rem 0.5rem 0.25rem 0;
       cursor: pointer;
+	  background-color: rgba(42, 42, 42, 0.6);
+      backdrop-filter: blur(10px);
+	  color: rgba(250,250,250,0.7);
+	  border-radius: 10px;
+    }
+    .result {
+      margin-top: 1rem;
+      font-size: 1.1rem;
+      color: rgba(250,250,250,0.7);
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <input type="text" id="timeInput" readonly>
+    <input type="text" id="timeInput" placeholder="點上班或下班產生時間" />
     <div>
       <button onclick="setTime('上班')">上班</button>
       <button onclick="setTime('下班')">下班</button>
       <button onclick="sendToWeChat()">打開微信</button>
+      <button onclick="calculateLeaveTime()">預估下班時間</button>
     </div>
+    <div class="result" id="leaveTimeResult"></div>
   </div>
 
   <script>
     let lastCopiedText = '';
 
     function setTime(type) {
+      console.log(`[setTime] type = ${type}`);
       const now = new Date();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
@@ -55,23 +72,56 @@
       const input = document.getElementById('timeInput');
       input.value = timeStr;
       lastCopiedText = timeStr;
+	  
+	  calculateLeaveTime();
 
-      navigator.clipboard.writeText(timeStr).then(() => {
-        alert('已複製到剪貼簿！');
-      }).catch(err => {
-        alert('複製失敗，請手動複製');
-        console.error(err);
-      });
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(timeStr)
+            .then(() => {
+              console.log('已複製到剪貼簿');
+              alert('已複製到剪貼簿！');
+            })
+            .catch(err => {
+              console.error('剪貼簿錯誤:', err);
+              alert('複製失敗，請手動複製');
+            });
+        } else {
+          alert('瀏覽器不支援剪貼簿功能');
+        }
+      } catch (e) {
+        console.error('setTime 錯誤:', e);
+      }
     }
 
     function sendToWeChat() {
+      console.log('[sendToWeChat]');
       if (!lastCopiedText) {
         alert('請先按上班或下班再傳送！');
         return;
       }
-
-      // 嘗試打開微信 App（若已安裝）
       location.href = 'weixin://';
+    }
+
+    function calculateLeaveTime() {
+      console.log('[calculateLeaveTime]');
+      const inputStr = document.getElementById('timeInput').value;
+      const match = inputStr.match(/\d{2}\/\d{2} \d{2}:\d{2}/);
+      if (!match) {
+        alert('請先輸入有效的上班時間！');
+        return;
+      }
+
+      const [datePart, timePart] = match[0].split(' ');
+      const [month, day] = datePart.split('/');
+      const [hour, minute] = timePart.split(':');
+
+      const now = new Date();
+      const baseDate = new Date(now.getFullYear(), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+      baseDate.setMinutes(baseDate.getMinutes() + 570); // 9 小時 30 分鐘
+
+      const leaveStr = `預估下班時間：${String(baseDate.getMonth() + 1).padStart(2, '0')}/${String(baseDate.getDate()).padStart(2, '0')} ${String(baseDate.getHours()).padStart(2, '0')}:${String(baseDate.getMinutes()).padStart(2, '0')}`;
+      document.getElementById('leaveTimeResult').textContent = leaveStr;
     }
   </script>
 </body>
