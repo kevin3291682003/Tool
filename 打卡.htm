@@ -54,15 +54,16 @@
       <button onclick="setTime('下班')">下班</button>
       <button onclick="sendToWeChat()">打開微信</button>
       <button onclick="calculateLeaveTime()">預估下班時間</button>
+      <button onclick="checkRemainingTime()">還剩多久？</button>
     </div>
     <div class="result" id="leaveTimeResult"></div>
+    <div class="result" id="remainingTimeResult"></div>
   </div>
 
   <script>
     let lastCopiedText = '';
 
     function setTime(type) {
-      console.log(`[setTime] type = ${type}`);
       const now = new Date();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
@@ -73,29 +74,21 @@
       input.value = timeStr;
       lastCopiedText = timeStr;
 	  
-	  calculateLeaveTime();
+	  leaveTimeResult();
 
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(timeStr)
-            .then(() => {
-              console.log('已複製到剪貼簿');
-              alert('已複製到剪貼簿！');
-            })
-            .catch(err => {
-              console.error('剪貼簿錯誤:', err);
-              alert('複製失敗，請手動複製');
-            });
-        } else {
-          alert('瀏覽器不支援剪貼簿功能');
-        }
-      } catch (e) {
-        console.error('setTime 錯誤:', e);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(timeStr)
+          .then(() => alert('已複製到剪貼簿！'))
+          .catch(err => {
+            alert('複製失敗，請手動複製');
+            console.error(err);
+          });
+      } else {
+        alert('瀏覽器不支援剪貼簿功能');
       }
     }
 
     function sendToWeChat() {
-      console.log('[sendToWeChat]');
       if (!lastCopiedText) {
         alert('請先按上班或下班再傳送！');
         return;
@@ -103,25 +96,53 @@
       location.href = 'weixin://';
     }
 
-    function calculateLeaveTime() {
-      console.log('[calculateLeaveTime]');
+    function parseWorkTime() {
       const inputStr = document.getElementById('timeInput').value;
       const match = inputStr.match(/\d{2}\/\d{2} \d{2}:\d{2}/);
-      if (!match) {
-        alert('請先輸入有效的上班時間！');
-        return;
-      }
+      if (!match) return null;
 
       const [datePart, timePart] = match[0].split(' ');
       const [month, day] = datePart.split('/');
       const [hour, minute] = timePart.split(':');
+      const now = new Date();
+      return new Date(now.getFullYear(), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+    }
+
+    function calculateLeaveTime() {
+      const workTime = parseWorkTime();
+      if (!workTime) {
+        alert('請先輸入有效的上班時間！');
+        return;
+      }
+
+      workTime.setMinutes(workTime.getMinutes() + 510); // 8 小時 30 分鐘
+
+      const leaveStr = `預估下班時間：${String(workTime.getMonth() + 1).padStart(2, '0')}/${String(workTime.getDate()).padStart(2, '0')} ${String(workTime.getHours()).padStart(2, '0')}:${String(workTime.getMinutes()).padStart(2, '0')}`;
+      document.getElementById('leaveTimeResult').textContent = leaveStr;
+    }
+
+    function checkRemainingTime() {
+      const workTime = parseWorkTime();
+      if (!workTime) {
+        alert('請先輸入有效的上班時間！');
+        return;
+      }
+
+      const leaveTime = new Date(workTime.getTime());
+      leaveTime.setMinutes(leaveTime.getMinutes() + 510);
 
       const now = new Date();
-      const baseDate = new Date(now.getFullYear(), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
-      baseDate.setMinutes(baseDate.getMinutes() + 570); // 9 小時 30 分鐘
+      const diff = leaveTime - now;
 
-      const leaveStr = `預估下班時間：${String(baseDate.getMonth() + 1).padStart(2, '0')}/${String(baseDate.getDate()).padStart(2, '0')} ${String(baseDate.getHours()).padStart(2, '0')}:${String(baseDate.getMinutes()).padStart(2, '0')}`;
-      document.getElementById('leaveTimeResult').textContent = leaveStr;
+      if (diff <= 0) {
+        document.getElementById('remainingTimeResult').textContent = '🎉 可以下班了！';
+        return;
+      }
+
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+
+      document.getElementById('remainingTimeResult').textContent = `⏳ 距離下班還有 ${hours} 小時 ${minutes} 分鐘`;
     }
   </script>
 </body>
