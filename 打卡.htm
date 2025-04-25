@@ -76,16 +76,12 @@
 	  
 	  leaveTimeResult();
 
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(timeStr)
-          .then(() => alert('已複製到剪貼簿！'))
-          .catch(err => {
-            alert('複製失敗，請手動複製');
-            console.error(err);
-          });
-      } else {
-        alert('瀏覽器不支援剪貼簿功能');
-      }
+      navigator.clipboard.writeText(timeStr).then(() => {
+        alert('已複製到剪貼簿！');
+      }).catch(err => {
+        alert('複製失敗，請手動複製');
+        console.error(err);
+      });
     }
 
     function sendToWeChat() {
@@ -93,6 +89,8 @@
         alert('請先按上班或下班再傳送！');
         return;
       }
+
+      // 嘗試打開微信 App（若已安裝）
       location.href = 'weixin://';
     }
 
