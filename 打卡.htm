@@ -24,20 +24,20 @@
       padding: 0.5rem;
       font-size: 1rem;
       margin-bottom: 1rem;
-	  background-color: rgba(42, 42, 42, 0.6);
+      background-color: rgba(42, 42, 42, 0.6);
       backdrop-filter: blur(10px);
-	  border-radius: 10px;
-	  color: rgba(250,250,250,0.7);
+      border-radius: 10px;
+      color: rgba(250,250,250,0.7);
     }
     button {
       padding: 0.5rem 1rem;
       font-size: 1rem;
       margin: 0.25rem 0.5rem 0.25rem 0;
       cursor: pointer;
-	  background-color: rgba(42, 42, 42, 0.6);
+      background-color: rgba(42, 42, 42, 0.6);
       backdrop-filter: blur(10px);
-	  color: rgba(250,250,250,0.7);
-	  border-radius: 10px;
+      color: rgba(250,250,250,0.7);
+      border-radius: 10px;
     }
     .result {
       margin-top: 1rem;
@@ -63,6 +63,55 @@
   <script>
     let lastCopiedText = '';
 
+    // IndexedDB 基本初始化
+    const dbName = 'PunchClockDB';
+    const storeName = 'TimeStore';
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1);
+
+        request.onupgradeneeded = function (event) {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains(storeName)) {
+            db.createObjectStore(storeName);
+          }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function saveTimeToDB(value) {
+      openDB().then(db => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.put(value, 'lastTime');
+      });
+    }
+
+    function loadTimeFromDB() {
+      openDB().then(db => {
+        const tx = db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const request = store.get('lastTime');
+
+        request.onsuccess = function () {
+          if (request.result) {
+            document.getElementById('timeInput').value = request.result;
+            lastCopiedText = request.result;
+            calculateLeaveTime();
+            checkRemainingTime();
+          }
+        };
+      });
+    }
+
+    window.onload = function () {
+      loadTimeFromDB();
+    };
+
     function setTime(type) {
       const now = new Date();
       const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -73,8 +122,10 @@
       const input = document.getElementById('timeInput');
       input.value = timeStr;
       lastCopiedText = timeStr;
-	  
-	  leaveTimeResult();
+
+      saveTimeToDB(timeStr);
+      calculateLeaveTime();
+      checkRemainingTime();
 
       navigator.clipboard.writeText(timeStr).then(() => {
         alert('已複製到剪貼簿！');
@@ -89,8 +140,6 @@
         alert('請先按上班或下班再傳送！');
         return;
       }
-
-      // 嘗試打開微信 App（若已安裝）
       location.href = 'weixin://';
     }
 
@@ -109,12 +158,10 @@
     function calculateLeaveTime() {
       const workTime = parseWorkTime();
       if (!workTime) {
-        alert('請先輸入有效的上班時間！');
+        document.getElementById('leaveTimeResult').textContent = '';
         return;
       }
-
-      workTime.setMinutes(workTime.getMinutes() + 510); // 8 小時 30 分鐘
-
+      workTime.setMinutes(workTime.getMinutes() + 510);
       const leaveStr = `預估下班時間：${String(workTime.getMonth() + 1).padStart(2, '0')}/${String(workTime.getDate()).padStart(2, '0')} ${String(workTime.getHours()).padStart(2, '0')}:${String(workTime.getMinutes()).padStart(2, '0')}`;
       document.getElementById('leaveTimeResult').textContent = leaveStr;
     }
@@ -122,13 +169,12 @@
     function checkRemainingTime() {
       const workTime = parseWorkTime();
       if (!workTime) {
-        alert('請先輸入有效的上班時間！');
+        document.getElementById('remainingTimeResult').textContent = '';
         return;
       }
 
       const leaveTime = new Date(workTime.getTime());
       leaveTime.setMinutes(leaveTime.getMinutes() + 510);
-
       const now = new Date();
       const diff = leaveTime - now;
 
@@ -139,7 +185,6 @@
 
       const hours = Math.floor(diff / 3600000);
       const minutes = Math.floor((diff % 3600000) / 60000);
-
       document.getElementById('remainingTimeResult').textContent = `⏳ 距離下班還有 ${hours} 小時 ${minutes} 分鐘`;
     }
   </script>
