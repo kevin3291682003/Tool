@@ -69,10 +69,9 @@
         .note {
             width: 100%;
             max-height: 200px;
-            background: rgba(255, 248, 180, 0.6);
             border-radius: 10px;
             padding: 14px;
-            opacity: 0.5;
+            opacity: 0.55;
             transition: opacity 0.3s ease;
             overflow: hidden;
         }
@@ -148,27 +147,33 @@
     </div>
 
     <script>
-        // ==============================================
-        // 打開網頁 → 自動載入 md-list.json
-        // 自動讀取所有 MD 內容
-        // ==============================================
         const wrapper = document.getElementById("notesWrapper");
 
-        // 啟動就自動執行
+        // ============================
+        // 隨機顏色 HSV 亮度固定
+        // ============================
+        function getRandomPastelColor() {
+            const hue = Math.floor(Math.random() * 360); // 隨機色相 0~360
+            const saturation = 70; // 飽和度固定
+            const lightness = 85;  // 亮度固定（你要的）
+            return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+        }
+
+        // 啟動自動載入
         window.onload = async function () {
             try {
-                // 1. 自動讀取清單
                 const listRes = await fetch("md-list.json");
                 const mdFiles = await listRes.json();
 
-                // 2. 自動依序讀取每個 MD 內容
                 let html = "";
                 for (const file of mdFiles) {
                     try {
                         const res = await fetch(file);
                         const text = await res.text();
+                        const color = getRandomPastelColor();
+                        
                         html += `
-                        <div class="note">
+                        <div class="note" style="background:${color};">
                             <div class="note-content">${text}</div>
                         </div>`;
                     } catch (e) {
@@ -179,7 +184,6 @@
                     }
                 }
 
-                // 3. 顯示到畫面（雙倍無縫循環）
                 wrapper.innerHTML = html + html;
 
             } catch (e) {
