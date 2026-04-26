@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MD 自動跑馬燈便利貼</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft JhengHei", sans-serif;
+        }
+
+        body {
+            background: #111;
+            min-height: 100vh;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        /* 頂部 + 按鈕 */
+        .add-btn {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 999;
+            transition: 0.3s;
+        }
+        .add-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* 跑馬燈 */
+        .marquee-container {
+            width: 340px;
+            height: 85vh;
+            margin: 80px auto 0;
+            overflow: hidden;
+        }
+
+        .marquee-content {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            animation: scrollUp 28s linear infinite;
+        }
+
+        .marquee-container:hover .marquee-content {
+            animation-play-state: paused;
+        }
+
+        @keyframes scrollUp {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
+        }
+
+        /* 便利貼 */
+        .note {
+            width: 100%;
+            max-height: 200px;
+            background: rgba(255, 248, 180, 0.6);
+            border-radius: 10px;
+            padding: 14px;
+            opacity: 0.5;
+            transition: opacity 0.3s ease;
+            overflow: hidden;
+        }
+        .note:hover {
+            opacity: 1;
+        }
+
+        .note-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #222;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* 新增彈窗 */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-box {
+            width: 400px;
+            background: #222;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        textarea {
+            width: 100%;
+            height: 180px;
+            background: #333;
+            border: none;
+            color: #fff;
+            padding: 12px;
+            border-radius: 6px;
+            resize: none;
+            margin-bottom: 12px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        button {
+            padding: 6px 14px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="add-btn">+</button>
+
+    <div class="marquee-container">
+        <div class="marquee-content" id="notesWrapper"></div>
+    </div>
+
+    <!-- 新增彈窗 -->
+    <div class="modal" id="modal">
+        <div class="modal-box">
+            <textarea id="noteInput" placeholder="輸入你的 MD 內容"></textarea>
+            <div class="btn-group">
+                <button id="cancel">取消</button>
+                <button id="save">儲存成 .md 檔</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==============================================
+        // 打開網頁 → 自動載入 md-list.json
+        // 自動讀取所有 MD 內容
+        // ==============================================
+        const wrapper = document.getElementById("notesWrapper");
+
+        // 啟動就自動執行
+        window.onload = async function () {
+            try {
+                // 1. 自動讀取清單
+                const listRes = await fetch("C:\Users\SME20\OneDrive\Documents\Html\Note\md-list.json");
+                const mdFiles = await listRes.json();
+
+                // 2. 自動依序讀取每個 MD 內容
+                let html = "";
+                for (const file of mdFiles) {
+                    try {
+                        const res = await fetch(file);
+                        const text = await res.text();
+                        html += `
+                        <div class="note">
+                            <div class="note-content">${text}</div>
+                        </div>`;
+                    } catch (e) {
+                        html += `
+                        <div class="note" style="background:#ffd5d5">
+                            <div class="note-content">❌ 無法讀取 ${file}</div>
+                        </div>`;
+                    }
+                }
+
+                // 3. 顯示到畫面（雙倍無縫循環）
+                wrapper.innerHTML = html + html;
+
+            } catch (e) {
+                wrapper.innerHTML = `
+                <div class="note" style="background:#ffd5d5">
+                    <div class="note-content">❌ 無法讀取 md-list.json</div>
+                </div>`;
+            }
+        };
+
+        // + 按鈕
+        document.querySelector(".add-btn").onclick = () => {
+            document.getElementById("modal").style.display = "flex";
+        };
+        document.getElementById("cancel").onclick = () => {
+            document.getElementById("modal").style.display = "none";
+        };
+
+        // 儲存下載 MD
+        document.getElementById("save").onclick = () => {
+            const content = document.getElementById("noteInput").value.trim();
+            if (!content) return;
+
+            const blob = new Blob([content], { type: "text/markdown" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "new-note.md";
+            a.click();
+
+            document.getElementById("modal").style.display = "none";
+        };
+    </script>
+</body>
+</html>
