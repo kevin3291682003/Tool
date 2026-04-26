@@ -158,7 +158,7 @@
         window.onload = async function () {
             try {
                 // 1. 自動讀取清單
-                const listRes = await fetch("C:\\Users\\SME20\\OneDrive\\Documents\\Html\\Note\\md-list.json");
+                const listRes = await fetch("md-list.json");
                 const mdFiles = await listRes.json();
 
                 // 2. 自動依序讀取每個 MD 內容
