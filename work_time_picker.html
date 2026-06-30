@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>上下班時間選擇器</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        background: #111;
+        color: #ddd;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .app {
+        width: 360px;
+        padding: 24px;
+        background: #1a1a1a;
+        border-radius: 24px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+
+    h2 {
+        margin: 0 0 24px;
+        text-align: center;
+        font-size: 22px;
+        font-weight: 600;
+        color: #f2f2f2;
+    }
+
+    .section {
+        margin-bottom: 28px;
+    }
+
+    .label {
+        margin-bottom: 10px;
+        font-size: 15px;
+        color: #aaa;
+        letter-spacing: 1px;
+    }
+
+    .picker-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        background: #242424;
+        border-radius: 18px;
+        padding: 14px 10px;
+        position: relative;
+    }
+
+    .picker-row::before {
+        content: "";
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        top: 50%;
+        height: 44px;
+        transform: translateY(-50%);
+        border-top: 1px solid rgba(255,255,255,0.18);
+        border-bottom: 1px solid rgba(255,255,255,0.18);
+        pointer-events: none;
+    }
+
+    .wheel {
+        width: 86px;
+        height: 132px;
+        overflow-y: scroll;
+        scroll-snap-type: y mandatory;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        text-align: center;
+        border-radius: 14px;
+    }
+
+    .wheel::-webkit-scrollbar {
+        display: none;
+    }
+
+    .item {
+        height: 44px;
+        line-height: 44px;
+        font-size: 30px;
+        font-weight: 500;
+        color: #777;
+        scroll-snap-align: center;
+        user-select: none;
+    }
+
+    .item.selected {
+        color: #f5f5f5;
+        font-size: 34px;
+        font-weight: 700;
+    }
+
+    .separator {
+        font-size: 34px;
+        color: #ccc;
+        z-index: 1;
+    }
+
+    .red .item.selected {
+        color: #ff4d4d;
+    }
+
+    .output {
+        width: 100%;
+        height: 88px;
+        resize: none;
+        border: none;
+        outline: none;
+        border-radius: 14px;
+        padding: 14px;
+        background: #101010;
+        color: #f0f0f0;
+        font-size: 17px;
+        line-height: 1.6;
+        font-family: Consolas, "SF Mono", monospace;
+        margin-top: 8px;
+    }
+
+    button {
+        width: 100%;
+        margin-top: 14px;
+        padding: 14px;
+        border: none;
+        border-radius: 14px;
+        background: #3a3a3a;
+        color: #f2f2f2;
+        font-size: 17px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    button:active {
+        background: #555;
+    }
+
+    .hint {
+        margin-top: 10px;
+        min-height: 20px;
+        text-align: center;
+        font-size: 14px;
+        color: #8f8f8f;
+    }
+</style>
+</head>
+
+<body>
+<div class="app">
+    <h2>上下班時間</h2>
+
+    <div class="section">
+        <div class="label">上班</div>
+        <div class="picker-row">
+            <div class="wheel" id="startHour"></div>
+            <div class="separator">:</div>
+            <div class="wheel" id="startMinute"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="label" id="endLabel">下班</div>
+        <div class="picker-row" id="endPickerRow">
+            <div class="wheel" id="endHour"></div>
+            <div class="separator">:</div>
+            <div class="wheel" id="endMinute"></div>
+        </div>
+    </div>
+
+    <textarea class="output" id="outputText" readonly></textarea>
+    <button id="copyBtn">複製</button>
+    <div class="hint" id="copyHint"></div>
+</div>
+
+<script>
+    const ITEM_HEIGHT = 44;
+    const WORK_MINUTES = 9 * 60 + 30;
+
+    const wheels = {
+        startHour: document.getElementById("startHour"),
+        startMinute: document.getElementById("startMinute"),
+        endHour: document.getElementById("endHour"),
+        endMinute: document.getElementById("endMinute")
+    };
+
+    const endPickerRow = document.getElementById("endPickerRow");
+    const outputText = document.getElementById("outputText");
+    const copyBtn = document.getElementById("copyBtn");
+    const copyHint = document.getElementById("copyHint");
+
+    let startHour = 9;
+    let startMinute = 0;
+    let endHour = 18;
+    let endMinute = 30;
+
+    let userChangedEnd = false;
+    let isProgrammaticScroll = false;
+
+    function pad2(num) {
+        return String(num).padStart(2, "0");
+    }
+
+    function createWheel(el, max) {
+        const topSpacer = document.createElement("div");
+        topSpacer.className = "item";
+        topSpacer.textContent = "";
+        el.appendChild(topSpacer);
+
+        for (let i = 0; i <= max; i++) {
+            const item = document.createElement("div");
+            item.className = "item";
+            item.textContent = pad2(i);
+            item.dataset.value = i;
+            el.appendChild(item);
+        }
+
+        const bottomSpacer = document.createElement("div");
+        bottomSpacer.className = "item";
+        bottomSpacer.textContent = "";
+        el.appendChild(bottomSpacer);
+    }
+
+    function setWheelValue(el, value) {
+        isProgrammaticScroll = true;
+        el.scrollTop = value * ITEM_HEIGHT;
+
+        setTimeout(() => {
+            updateSelected(el, value);
+            isProgrammaticScroll = false;
+        }, 0);
+    }
+
+    function getWheelValue(el) {
+        const value = Math.round(el.scrollTop / ITEM_HEIGHT);
+        const max = el.children.length - 3;
+
+        if (value < 0) return 0;
+        if (value > max) return max;
+        return value;
+    }
+
+    function updateSelected(el, value) {
+        Array.from(el.children).forEach(child => {
+            child.classList.remove("selected");
+        });
+
+        const selectedItem = el.querySelector(`[data-value="${value}"]`);
+        if (selectedItem) {
+            selectedItem.classList.add("selected");
+        }
+    }
+
+    function bindWheel(el, callback) {
+        let timer = null;
+
+        el.addEventListener("scroll", () => {
+            clearTimeout(timer);
+
+            timer = setTimeout(() => {
+                const value = getWheelValue(el);
+                el.scrollTo({
+                    top: value * ITEM_HEIGHT,
+                    behavior: "smooth"
+                });
+
+                updateSelected(el, value);
+
+                if (!isProgrammaticScroll) {
+                    callback(value);
+                }
+            }, 80);
+        });
+    }
+
+    function getTodayBaseDate() {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    }
+
+    function formatDate(date) {
+        return `${pad2(date.getMonth() + 1)}/${pad2(date.getDate())}`;
+    }
+
+    function getStartTotalMinutes() {
+        return startHour * 60 + startMinute;
+    }
+
+    function getEndTotalMinutesRaw() {
+        return endHour * 60 + endMinute;
+    }
+
+    function getWorkDurationMinutes() {
+        let startTotal = getStartTotalMinutes();
+        let endTotal = getEndTotalMinutesRaw();
+
+        if (endTotal < startTotal) {
+            endTotal += 24 * 60;
+        }
+
+        return endTotal - startTotal;
+    }
+
+    function updateEndByStart() {
+        const total = getStartTotalMinutes() + WORK_MINUTES;
+        endHour = Math.floor(total / 60) % 24;
+        endMinute = total % 60;
+
+        setWheelValue(wheels.endHour, endHour);
+        setWheelValue(wheels.endMinute, endMinute);
+    }
+
+    function updateOutput() {
+        const today = getTodayBaseDate();
+
+        const startDate = new Date(today);
+        startDate.setHours(startHour, startMinute, 0, 0);
+
+        const endDate = new Date(today);
+        endDate.setHours(endHour, endMinute, 0, 0);
+
+        if (getEndTotalMinutesRaw() < getStartTotalMinutes()) {
+            endDate.setDate(endDate.getDate() + 1);
+        }
+
+        const duration = getWorkDurationMinutes();
+        const isShorterThanDefault = duration < WORK_MINUTES;
+
+        endPickerRow.classList.toggle("red", isShorterThanDefault);
+
+        outputText.value =
+            `上班 ${formatDate(startDate)} ${pad2(startHour)}:${pad2(startMinute)}\n` +
+            `下班 ${formatDate(endDate)} ${pad2(endHour)}:${pad2(endMinute)}`;
+    }
+
+    function init() {
+        createWheel(wheels.startHour, 23);
+        createWheel(wheels.startMinute, 59);
+        createWheel(wheels.endHour, 23);
+        createWheel(wheels.endMinute, 59);
+
+        bindWheel(wheels.startHour, value => {
+            startHour = value;
+
+            //if (!userChangedEnd) {
+                updateEndByStart();
+            //}
+
+            updateOutput();
+        });
+
+        bindWheel(wheels.startMinute, value => {
+            startMinute = value;
+
+            //if (!userChangedEnd) {
+                updateEndByStart();
+            //}
+
+            updateOutput();
+        });
+
+        bindWheel(wheels.endHour, value => {
+            userChangedEnd = true;
+            endHour = value;
+            updateOutput();
+        });
+
+        bindWheel(wheels.endMinute, value => {
+            userChangedEnd = true;
+            endMinute = value;
+            updateOutput();
+        });
+
+        setWheelValue(wheels.startHour, startHour);
+        setWheelValue(wheels.startMinute, startMinute);
+        setWheelValue(wheels.endHour, endHour);
+        setWheelValue(wheels.endMinute, endMinute);
+
+        updateOutput();
+    }
+
+    copyBtn.addEventListener("click", async () => {
+        try {
+            await navigator.clipboard.writeText(outputText.value);
+            copyHint.textContent = "已複製";
+        } catch (e) {
+            outputText.select();
+            document.execCommand("copy");
+            copyHint.textContent = "已複製";
+        }
+
+        setTimeout(() => {
+            copyHint.textContent = "";
+        }, 1500);
+    });
+
+    init();
+</script>
+</body>
+</html>
